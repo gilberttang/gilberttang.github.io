@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>CS114 Project 3: Cloth Simulation using Mass-Spring System</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="">
+  <meta name="author" content="">
+
+  <!-- Le styles -->
+  <link href="../../css/bootstrap.css" rel="stylesheet">
+  <link href="../../css/cs114.css" rel="stylesheet">
+  <style>
+    span.tt {
+      background-color: #eee;
+    }
+  </style>  
+
+  <!-- Le HTML5 shim, for IE6-8 support of HTML5 elements -->
+  <!--[if lt IE 9]>
+    <script src="http://html5shim.googlecode.com/svn/trunk/html5.js"></script>
+  <![endif]-->
+
+  <script type="text/javascript" src="../../js/jquery.js"></script>
+  <script type="text/javascript" src="../../js/bootstrap.js"></script>
+  <script type="text/x-mathjax-config">
+    MathJax.Hub.Config({
+      tex2jax: {inlineMath: [['$','$'], ['\\(','\\)']]}
+    });
+  </script>
+  <script type="text/javascript" src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+</head>
+
+  <div class="container" id="main">
+    <h1 id="head1">CS114 Project 3:<br><span class=subtitle>Cloth Simulation using Mass-Spring System</span></h1>
+    <p class="courseinfo">Due: Sunday May 15, 2016 (23:59pm Pacific Time)</p>
+    <p class="courseinfo"><em>Work individually or in groups of two.</em></p>
+
+    <h2 id="overview">Overview</h2>
+    <p style="font-size:16px">
+      Download the project codebase <a href="pa3_student.zip">here</a>.
+      Please use <a href="https://piazza.com/uci/spring2016/cs114/home">Piazza</a> for questions, discussions, and pairing up.
+    </p>
+    <p>
+      In this project, you will implement a simple cloth simulator for animating a rectangular piece of cloth.
+    </p>
+
+    <h2>1. Mass-Spring System</h2>
+    <p>
+      As discussed in <a href="../../slides/mass_spring.pdf">class</a>, we consider the cloth as a collection of particles interconnected with three types of springs:
+      <img alt="" src="images/fig1.jpg" style="display:block;margin:5px auto 5px auto">      
+      The rest of this section details this mass-spring system.
+    </p>
+
+    <h3>1.1. Particles</h3>
+    <p>
+      We assume the cloth contains $n \times n$ (evenly spaced) particles and use $[i, j]$ (where $0 \leq i, j < n$) to denote the particle located at the $i$-th row and $j$-th column.
+      Each particle $[i, j]$ has the following <em>states</em>:
+    </p>
+    <ul>
+      <li><b>Mass</b> $m$ (we assume all particles to have identical masses).</li>
+      <li><b>Position</b> $\mathrm{x}_{i, j}(t)$.</li>
+      <li>
+        <b>Velocity</b> $\mathrm{v}_{i, j}(t)$ which equals the derivate of $\mathrm{x}_{i, j}(t)$ with respect to $t$:
+        $\mathrm{v}_{i, j}(t) = \dot{\mathrm{x}}_{i, j}(t)$.
+      </li>
+    </ul>
+    <p>
+      The position and velocity of a particle are affected by various types of forces (see Section 1.3).
+      In particular, assuming the accumulated force acting on particle $[i, j]$ at time $t$ to be $\mathrm{F}_{i, j}(t)$, then <a href="https://en.wikipedia.org/wiki/Newton%27s_laws_of_motion#Newton.27s_second_law">Newton's second law of motion</a> tells us that the <b>acceleration</b> of this particle at time $t$ equals
+      $$\mathrm{a}_{i, j}(t) = \dot{\mathrm{v}}_{i,j}(t) = \ddot{\mathrm{x}}_{i,j}(t) = \frac{\mathrm{F}_{i, j}(t)}{m}.$$
+    </p>
+
+    <h3>1.2. Springs</h3>
+    <p>
+      There are three types of springs connecting all particles: <em>structural</em>, <em>shear</em>, and <em>flexion (bend)</em>.
+    </p>
+    <ul>
+      <li><b>Structural:</b> each particle $[i, j]$ is connected to (up to) four particles via structural connections: $[i, j + 1]$, $[i, j - 1]$, $[i + 1, j]$, $[i - 1, j]$.</li>
+      <li><b>Shear:</b> each particle $[i, j]$ is connected to (up to) four particles via shear connections: $[i + 1, j + 1]$, $[i + 1, j - 1]$, $[i - 1, j - 1]$, $[i - 1, j + 1]$.</li>
+      <li><b>Flexion:</b> each particle $[i, j]$ is connected to (up to) four particles via flexion connections: $[i, j + 2]$, $[i, j - 2]$, $[i + 2, j]$, $[i - 2, j]$.</li>
+    </ul>
+    <p>
+      Thus, each particle can have up to 12 directly connected neighbors.
+    </p>
+    <p>
+      <b>Stiffness:</b> in this project, we assume all structural springs to have stiffness $K_0$, shear springs $K_1$, and flexion strings $K_2$.
+    </p>
+    <p>
+      <b>Rest length:</b> generally, a piece of cloth is considered to be in its rest state when there is no deformation (caused by stretching, shearing, or bending).
+      In this project, the original shape of the cloth is a rectangle of size $4 \times 4$.
+      It follows that the rest lengths for all structural, shear, and flexion springs are $4/(n - 1)$, $4\sqrt{2}/(n - 1)$, and $8/(n - 1)$, respectively.
+    </p>    
+
+    <h3>1.3. Forces</h3>
+    <p>
+      There are four types of forces you will need to consider for this project:
+    </p>
+    <ul>
+      <li>
+        <b>Spring forces:</b> given spring connecting two particles located at $\mathrm{p}$ and $\mathrm{q}$ with stiffness $K$ and rest length $L_0$, the spring force acting on $\mathrm{p}$ equals
+        $$ \mathrm{F}_{\text{spring}} = K(L_0 - \| \mathrm{p} - \mathrm{q} \|) \frac{\mathrm{p} - \mathrm{q}}{\| \mathrm{p} - \mathrm{q} \|}. $$
+        This force changes over time as the particles move.
+      </li>
+      <li style="margin-top:10px">
+        <b>Gravity:</b> each particle is affected by (simple) gravity given by
+        $$ \mathrm{F}_{\text{gravity}} = \begin{pmatrix} 0\\ -mg\\ 0 \end{pmatrix}, $$
+        where $g = 9.8$.
+        Notice that in this project, the "up" direction is the Y-axis (i.e., [0, 1, 0]), NOT the Z-axis.
+        This force stays constant over time.
+      </li>
+      <li style="margin-top:10px">
+        <b>Damping:</b> for a particle with velocity $\mathrm{v}$, the amount of damping force it receives equals $\mathrm{F}_{\text{damp}} = -c_d\,\mathrm{v}$ where $c_d > 0$ is a constant.
+        This force changes over time as $\mathrm{v}$ changes.
+      </li>
+      <li style="margin-top:10px">
+        <b>Viscous fluid:</b> to handle a cloth's viscous behavior, we assume each particle with velocity $\mathrm{v}$ is pushed by an imaginary viscous fluid with
+        $$ \mathrm{F}_{\text{viscous}} = c_v [\mathrm{n} \cdot (\mathrm{u}_\text{fluid} - \mathrm{v})] \mathrm{n}, $$
+        where $\mathrm{n}$ is the surface normal at the particle's location, $c_v > 0$ is a constant, and $\mathrm{u}_\text{fluid}$ is a constant vector specifying the velocity of the viscous fluid.
+        This force changes over time.
+      </li>
+    </ul>
+
+    <h2>2. Animating the System</h2>
+    <p>
+      As mentioned in class, animating a mass-spring system involves solving an <em>initial value problem</em>.
+      In particular, for each particle $[i, j]$ you are given its mass $m$ (which stays constant for all particles), initial position $\mathrm{x}_{i,j}(0)$ and velocity $\mathrm{v}_{i,j}(0)$.
+      Given $\Delta t > 0$, you need to use Euler's method to compute the position and velocity of each particle at time-steps $\Delta t$, $2 \Delta t$, $3 \Delta t$, $\ldots$.
+    </p>
+    <p>
+      You need to <b>pin</b> two particles $[n - 1, 0]$ and $[n - 1, n - 1]$, which correspond to the upper left and right corners of the cloth.
+      That is, the positions of these particles are fixed to their inital values.
+      If no particle is pinned in place, the entire cloth will undergo a never-ending free fall because of gravity!
+    </p>
+
+    <h3>2.1. Codebase Overview</h3>
+    <p>
+      A WebGL based codebase similar to <a href="../proj1">Project 1</a> has been provided.
+      This time, the only source file you will need to touch is <span class="tt">proj3_sim.js</span>.
+    </p>
+    <p>
+      It is recommended to use <a href="https://www.google.com/chrome">Google Chrome</a> for executing your code, although recent versions of <a href="https://www.mozilla.org/en-US/firefox/">Mozilla Firefox</a> and <a href="https://www.microsoft.com/en-us/windows/microsoft-edge">Microsoft Edge</a> should also work.
+    </p>
+
+    <h4>Classes</h4>
+    <p>
+      A key class that you will be using is <span class="tt">vec3</span> from glMatrix version 0.9.5.
+      Useful member functions include <span class="tt">vec3.create()</span>, <span class="tt">vec3.add()</span>, <span class="tt">vec3.subtract()</span>, <span class="tt">vec3.scale()</span>, <span class="tt">vec3.length()</span>, <span class="tt">vec3.normalize()</span>, and <span class="tt">vec3.dot()</span>.
+      Check <span class="tt">js/glMatrix-0.9.5.js</span> to see how they work.
+    </p>
+    <p>
+      <b>Reminder:</b> several functions such as <span class="tt">vec3.add()</span>, <span class="tt">vec3.subtract()</span>, and <span class="tt">vec3.scale()</span> operate <em>in place</em>.
+      That is, calling <span class="tt">vec3.add(a, b)</span> will cause the value of <span class="tt">a</span> changing to <span class="tt">a + b</span>.
+      If you do NOT want <span class="tt">a</span> to be modified, create a copy of it using <span class="tt">vec3.create()</span>.
+      For instance, <span class="tt">c = vec3.add(vec3.create(a), b)</span> will make <span class="tt">c</span> to have the value <span class="tt">a + b</span> without changing the value of <span class="tt">a</span>.
+    </p>
+
+    <h4>Global Variables</h4>
+    <p>
+      A number of global variables are used to store various mass-spring system configurations and particle states.
+    </p>
+    <p><b>Constants (time-invariant):</b></p>
+    <ul>
+      <li><span class="tt">meshResolution</span> stores the integer $n$ which determines the total number of particles (see Section 1.1).</li>
+      <li><span class="tt">mass</span> stores the mass $m$ for every particle.</li>
+      <li style="margin-top:10px"><span class="tt">K</span> is a <span class="tt">vec3</span> where <span class="tt">K[0]</span>, <span class="tt">K[1]</span>, and <span class="tt">K[2]</span> indicate the stiffnesses of all structural, shear, and flexion springs, respectively.</li>
+      <li>Similarly, <span class="tt">restLength</span> is a <span class="tt">vec3</span> where <span class="tt">restLength[0]</span>, <span class="tt">restLength[1]</span>, and <span class="tt">restLength[2]</span> gives the rest lengths of structural, shear, and flexion springs, respectively.</li>
+      <li style="margin-top:10px"><span class="tt">Cd</span> stores the coefficient $c_d$ used for computing damping forces $\mathrm{F}_{\text{damp}}$.</li>
+      <li><span class="tt">Cv</span> and <span class="tt">uf</span> respectively store the coefficient $c_v$ and the vector $\mathrm{u}_{\text{fluid}}$ used for computing viscous forces $\mathrm{F}_{\text{viscous}}$.</li>
+    </ul>
+    <p>
+      All the time-invariant constants have been handled by the provided code.
+      You can directly access them in your code.
+    </p>
+
+    <p><b>Particle states (time-variant):</b></p>
+    <ul>
+      <li>
+        <span class="tt">vertexPosition</span> and <span class="tt">vertexVelocity</span> are two arrays storing the position and velocity of each particle, respectively.
+        You will need to <em>update</em> them in a step-by-step manner (see Section 2.2 for details).
+      </li>
+      <li style="margin-top:10px">
+        <span class="tt">vertexNormal</span> stores surface normal directions at each particle (which is needed for rendering as well as computing $\mathrm{F}_{\text{viscous}}$).
+        You do NOT have to modify this array: the provided code automatically changes vertex normals based on the updated positions.
+      </li>
+    </ul>
+
+    <h4>Global Functions</h4>
+    <p>
+      A number of getter &amp; setter functions are provided for your convenience:
+    </p>
+    <ul>
+      <li><span class="tt">getPosition(i, j)</span> returns the position of particle $[i, j]$ as a <span class="tt">vec3</span>.</li>
+      <li><span class="tt">setPosition(i, j, x)</span> sets the position of particle $[i, j]$ to <span class="tt">x</span>.</li>
+      <li style="margin-top:10px"><span class="tt">getNormal(i, j)</span> returns the surface normal at particle $[i, j]$ as a <span class="tt">vec3</span>.</li>
+      <li style="margin-top:10px"><span class="tt">getVelocity(i, j)</span> returns the velocity of particle $[i, j]$ as a <span class="tt">vec3</span>.</li>
+      <li><span class="tt">setVelocity(i, j, v)</span> sets the position of particle $[i, j]$ to <span class="tt">v</span>.</li>
+    </ul>
+
+    <h3>2.2. Function to Complete</h3>
+    <p>
+      Opening <span class="tt">proj3.html</span> in your browser will lead to a piece of cloth that stays still:
+      <img alt="" src="images/fig2.jpg" style="display:block;margin:10px auto 10px auto">
+      You will need to finish the key function <span class="tt">simulate()</span> in <span class="tt">proj3_sim.js</span> to animate the cloth.
+    </p>
+    <p>
+      This function takes one parameter <span class="tt">stepSize</span> (i.e, $\Delta t$) and performs ONE iteration of Euler's method.
+      Precisely, assuming <span class="tt">vertexPosition</span> and <span class="tt">vertexVelocity</span> currently stores the position $\mathrm{x}_{i,j}(t)$ and velocity $\mathrm{v}_{i,j}(t)$ for each particle $[i, j]$ at time $t$.
+      After executing <span class="tt">simulate()</span> once, <span class="tt">vertexPosition</span> and <span class="tt">vertexVelocity</span> should be updated so that they store $\mathrm{x}_{i,j}(t + \Delta t)$ and $\mathrm{v}_{i,j}(t + \Delta t)$, respectively.
+    </p>
+    <p>
+      To achieve this, you will need to do the following:
+    </p>
+    <ol>
+      <li>
+        Compute the accumulated force $\mathrm{F}_{i, j}$ acting on each particle $[i, j]$ for $i, j \in \{0, 1, \ldots, n - 1\}$ based on each particle's current position and velocity.
+      </li>
+      <li>
+        Update the position of each particle (except the two pinned ones) using
+        $$\mathrm{x}_{i, j} \gets \mathrm{x}_{i, j} + \Delta t\cdot\mathrm{v}_{i, j}, $$
+        and then the velocity using
+        $$\mathrm{v}_{i, j} \gets \mathrm{v}_{i, j} + \Delta t\,\frac{\mathrm{F}_{i,j}}{m}.$$
+      </li>
+    </ol>
+    <p>
+      With <span class="tt">simulate()</span> properly implemented, we should see the cloth deforming. Here we show an example frame:
+      <img alt="" src="images/fig3.jpg" style="display:block; margin:10px auto 10px auto">
+      Please submit your finished <span class="tt">proj3_sim.js</span>.
+    </p>
+  </div>
+</body>
+</html>

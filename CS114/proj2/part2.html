@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>CS114 Project 2: Monte Carlo Integration &amp; Path Tracing</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="">
+  <meta name="author" content="">
+
+  <!-- Le styles -->
+  <link href="../../css/bootstrap.css" rel="stylesheet">
+  <link href="../../css/cs114.css" rel="stylesheet">
+  <style>
+  h5 {
+    font-weight: bold;
+  }
+
+  span.tt {
+    background-color: #eee;
+  }
+  </style>
+
+  <!-- Le HTML5 shim, for IE6-8 support of HTML5 elements -->
+  <!--[if lt IE 9]>
+    <script src="http://html5shim.googlecode.com/svn/trunk/html5.js"></script>
+  <![endif]-->
+
+  <script type="text/javascript" src="../../js/jquery.js"></script>
+  <script type="text/javascript" src="../../js/bootstrap.js"></script>
+  <script type="text/x-mathjax-config">
+    MathJax.Hub.Config({
+      tex2jax: {inlineMath: [['$','$'], ['\\(','\\)']]}
+    });
+  </script>
+  <script type="text/javascript" src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+</head>
+
+  <div class="container" id="main">
+    <h1 id="head1">CS114 Project 2:<br><span class=subtitle>Monte Carlo Integration &amp; Path Tracing</span></h1>
+    <p class="courseinfo">Due: Tuesday May 3, 2016 (23:59pm Pacific Time)</p>
+    <p class="courseinfo"><em>Work individually or in groups of two.</em></p>
+
+    <h2>Part 2. Simple Path Tracing</h2>
+    <p style="font-size:16px">
+      <em>Download the project codebase <a href="simplept.cpp">here</a>.</em>
+    </p>
+
+    <p>
+      In this part, you will implement a simple path tracer which solves the Rendering Equation (RE) using Monte Carlo integration.
+      There is only one C++ source file <span class="tt">simplept.cpp</span> that you need to work on.
+      Although it suffices to have all your code inside this one file, feel free to introduce separate header/source files if you think that looks cleaner.
+    </p>
+
+    <h3>Codebase Overview</h3>
+    The following is a brief overview of the provided codebase.
+
+    <h4>Built-In Data Types</h4>
+
+    <h5>Random Number Generator</h5>
+    <p>
+      The codebase provides a thread-safe pseudo-random number generator <span class="tt">rng</span> (which is an instance of the class <span class="tt">RNG</span>) as a <em>global variable</em>.
+      You can simply call <span class="tt">rng()</span> anywhere in your code to draw a random floating point number from $[0, 1)$.
+    </p>
+
+    <h5>3D Vectors</h5>
+    <p>
+      The pre-implemented class <span class="tt">Vec</span> can be used to represent positions, directions, as well as RGB colors.
+      The following member functions have been provided:
+    </p>
+    <ul>
+      <li>
+        <span class="tt">operator+()</span>, <span class="tt">operator-()</span>, <span class="tt">mult()</span>:
+        <em>component-wise</em> addition, subtraction, and multiplication;
+      </li>
+      <li>
+        <span class="tt">operator*()</span>: vector-scalar multiplication;
+      </li>
+      <li>
+        <span class="tt">normalize()</span>: vector normalization;
+      </li>
+      <li>
+        <span class="tt">dot()</span>, <span class="tt">cross()</span>: vector <a href="https://en.wikipedia.org/wiki/Dot_product">dot</a> and <a href="https://en.wikipedia.org/wiki/Cross_product">cross</a> products.
+      </li>
+    </ul>
+    <p>
+      Read the provided code and get familiar with these functions!
+    </p>
+
+    <h5>Ray</h5>
+    <p>
+      The <span class="tt">Ray</span> class has two data fields:
+    </p>
+    <ul>
+      <li><span class="tt">Vec o</span>: the ray's origin (i.e., starting position);</li>
+      <li><span class="tt">Vec d</span>: the direction of the ray.</li>
+    </ul>
+    <p>
+      This class will be used for making various queries (e.g., ray-scene intersection, radiance estimation).
+    </p>
+
+    <h5>Reflectance Models (BRDFs)</h5>
+    <p>
+      The reflectance models share a common (virtual) base class called <span class="tt">BRDF</span>.
+      It has two (virtual) functions:
+    </p>
+    <ul>
+      <li><span class="tt">eval($\mathrm{n}$, $\omega_o$, $\omega_i$)</span> evaluates the function given incoming $\omega_i$, outgoing $\omega_o$, and local normal $\mathrm{n}$ directions.</li>
+      <li>
+        <span class="tt">sample($\mathrm{n}$, $\omega_o$, i, pdf)</span> randomly generates an incoming direction $\omega_i$ given the outgoing direction $\omega_o$ and local normal direction $\mathrm{n}$.
+        The sampled direction $\omega_i$ should be stored in <span class="tt">Vec &amp;i</span>, and the corresponding probability density value (i.e., $p(\omega_i)$) in <span class="tt">double &amp;pdf</span>.
+        Feel free to group <span class="tt">i</span> and <span class="tt">pdf</span> into one class if you prefer cleaner code.
+      </li>
+    </ul>
+    <p>
+      Notice that these functions do not take surface position $\mathrm{x}$ as input since we assume all objects to have spatially invariant BRDFs.
+    </p>
+    <p>
+      The codebase has one semi-implemented reflectance model: <span class="tt">DiffuseBRDF</span>.
+      Precisely, its <span class="tt">eval()</span> function has been provided, which implements
+      $$ f_r(\omega_i \leftrightarrow \omega_o) = \frac{k_d}{\pi}. $$
+      You will need to complete its <span class="tt">sample()</span> function (for Task 1).
+    </p>
+
+    <h5>Spheres</h5>
+    <p>
+      Since complex geometry is not the focus of this project, there is only one shape that you need to deal with: spheres.
+      The <span class="tt">Sphere</span> class contains the following data fields:
+    </p>
+    <ul>
+      <li><span class="tt">Vec p</span> stores the 3D position of the sphere's center;</li>
+      <li><span class="tt">double rad</span> stores the sphere's radius;</li>
+      <li><span class="tt">Vec e</span> stores the sphere's emitted radiance (in RGB) that is assumed to be identical in all directions;</li>
+      <li><span class="tt">const BRDF &amp;brdf</span> stores a reference to the sphere's BRDF.</li>
+    </ul>
+    <p>
+      In addition, ray-sphere-intersection has already been implemented via the <span class="tt">double Sphere::intersect()</span> function.
+      This function takes an instance of the <span class="tt">Ray</span> class, say <span class="tt">r</span>, and return 0.0 if the ray and the sphere does NOT intersect.
+      Otherwise, it returns $t > 0$ which gives the intersection point by <span class="tt">r.o + r.d*t</span>.
+    </p>
+
+    <h4>Scene Description</h4>
+    <p>
+      The provided codebase has a Cornell-Box-like scene hard-coded:
+      <img alt="" src="images/fig2.jpg" style="display:block;margin:5px auto 10px auto">
+    </p>
+
+    <h5>Objects</h5>
+    <p>
+      As shown above, the scene contains a number of spheres (the walls, the ceiling, and the floor are all spheres with large radii).
+      These spheres are stored in a global array named <span class="tt">spheres</span>.
+      Feel free to play with alternative configurations, but please keep the scene unchanged (unless insturcted otherwise by the following tasks) in your submissions.
+    </p>
+
+    <h5>Camera</h5>    
+
+    <h4>Built-In Global Functions</h4>
+    <p>
+      For your convenience, a number of useful global functions have been provided.
+    </p>
+
+    <h5><span class="tt">void createLocalCoord(const Vec &amp;n, Vec &amp;u, Vec &amp;v, Vec &amp;w)</span></h5>
+    <p>
+      As mentioned in class, this function takes a normal direction $\mathrm{n}$ and returns three vectors $\mathrm{u}$, $\mathrm{v}$, $\mathrm{w}$ that are unit-length, pairwise orthogonal, and satisfying $\mathrm{w} = \mathrm{n}$.
+      This function will be very useful for implementing direction sampling methods (e.g., <span class="tt">uniformRandomPSA()</span>).
+    </p>
+
+    <h5><span class="tt">bool intersect(const Ray &amp;r, double &amp;t, int &amp;id)</span></h5>
+    <p>
+      This function takes a Ray <span class="tt">r</span> and checks if it intersects any sphere in the scene.
+      If so, it does the following:
+    </p>
+    <ul>
+      <li>Set <span class="tt">t</span> such that the intersection point is at <span class="tt">r.o + r.d*t</span>;</li>
+      <li>Set <span class="tt">id</span> to the intersecting sphere's index (0 ~ 7);</li>
+      <li>Return <span class="tt">true</span>.</li>
+    </ul>
+    <p>Otherwise, the function simply returns <span class="tt">false</span>.</p>
+
+    <h4>Compiling Your Code</h4>
+    <p>
+      It is recommended to use MSVC or GCC to compile your code.
+    </p>
+    <h5>MSVC Users:</h5>
+    <p>
+      Please use MSVC 2010 or higher to compile your code.
+      You can create a Win32 Console project to utilize Visual Studio's powerful IDE, or simply compile your code on the command line.
+      Either way, remember to include <span class="tt">/openmp</span> to enable multi-threaded computation via OpenMP.
+      It is also recommended to increase the stack size to about 32MB by specifying <span class="tt">/F32000000</span> to avoid stack overflow.
+      To summarize, when using the command line, compile your code with <span class="tt">cl simplept.cpp /openmp /O2 /F32000000</span>.
+    </p>
+
+    <h5>GCC Users:</h5>
+    <p>
+      Please use GCC 4.2 or higher with good OpenMP support.
+      Compile your code with <span class="tt">g++ -std=c++11 -O3 -fopenmp -o simplept simplept.cpp</span>.
+    </p>
+
+    <h4>Running Your Code &amp; Viewing the Rendered Image</h4>
+    <p>
+      You need to run the compiled code under the command line by calling <span class="tt">simplept</span> followed by the number of samples per pixel (spp).
+      By default, the code runs at 4 spp.
+    </p>
+    <p>
+      After the rendering process is finished, an image named <span class="tt">image.ppm</span> in <a href="https://en.wikipedia.org/wiki/Netpbm_format#PPM_example">PPM</a> format will be saved under the working directory.
+      To view this image, use <a href="http://www.imagemagick.org/">ImageMagick</a>'s <span class="tt">display</span> command.
+      If you are a Windows user and prefer having a light-weight tool with a GUI, use <a href="http://www.irfanview.com/">IrfanView</a> instead.
+    </p>
+
+    <h3>Functions To Be Completed</h3>
+    <p>
+      The main function you will need to implement is <span class="tt">Vec receivedRadiance(const Ray &amp;r, int depth)</span>.
+      As mentioned in class, this function computes the radiance <em>received</em> at location <span class="tt">r.o</span> <em>from</em> direction <span class="tt">r.d</span>.
+      You will need to perform a ray tracing (by calling the global <span class="tt">intersect()</span> function) to find an actual surface point upon which regular (outgoing) radiance can be estimated.
+    </p>
+    <p>
+      As a placeholder, this function currently visualizes the normal directions for all surface points.
+      <img alt="" src="images/fig3.jpg" style="display:block;margin:5px auto 10px auto">
+      Please read the code and understand how the normal directions are computed: you will need it for later tasks!
+    </p>    
+
+    <h3>Task 1. Path Tracing Version 0.5</h3>
+    <p>
+      Your first task is to implement the "Version 0.5" path tracing algorithm (see page 19 of the <a href="../../slides/path_tracing.pdf">slides</a>).
+      Precisely, you need to implement a path tracing algorithm that
+    </p>
+    <ul>
+      <li>
+        Uses Russian roulette with <span class="tt">rrDepth = 5</span> and <span class="tt">survivalProbability = 0.9</span> to avoid infinite recursions;
+      </li>
+      <li>
+        Uses a fixed distribution <span class="tt">uniformRandomPSA()</span> to sample incoming directions.
+      </li>
+    </ul>
+    <p>
+      Your main task is to modify the global function <span class="tt">receivedRadiance()</span> accordingly.
+      Feel free to add additional functions (e.g., <span class="tt">radiance()</span>, <span class="tt">reflectedRadiance()</span>) if necessary.
+      To implement the sampling of incoming direction, you need to finish <span class="tt">DiffuseBRDF::sample()</span> using the <span class="tt">uniformRandomPSA()</span> method covered in class.
+    </p>
+    <p>
+      If everything works properly, you should be able to get renderings similar to below:
+    </p>
+    <table style="margin:0 auto 10px auto">
+      <tr>
+        <td style="padding:0 5px 0 5px"><img alt="" src="images/fig4_64.jpg"></td>
+        <td style="padding:0 5px 0 5px"><img alt="" src="images/fig4_256.jpg"></td>
+      </tr>
+      <tr>
+        <td style="text-align:center">64 spp</td>
+        <td style="text-align:center">256 spp</td>
+      </tr>
+    </table>
+    <p>
+      Create a folder named <span class="tt">task1</span> with all your source files for this task.
+    </p>
+
+    <h3>Task 2. Specular BRDFs</h3>
+    <p>
+      The goal of this task is adding the ideal specular BRDF (see slide 38) to the system.
+      In particular, you should implement a new class <span class="tt">SpecularBRDF</span> as a subclass of <span class="tt">BRDF</span>.
+    </p>
+    <p>
+      To use this new type of BRDF, create an instance with <span class="tt">ks = Vec(0.999, 0.999, 0.999)</span>.
+      Then, change the BRDF of the second last sphere (the one marked as "Ball 2") from <span class="tt">brightSurf</span> to this new specular BRDF instance.
+      If you have implemented Task 1 properly, <span class="tt">receivedRadiance()</span> (as well as all other radiance estimation functions) do not have to be modified.
+    </p>
+    <p>
+      With a correct implementation, you should see the following:
+    </p>
+    <table style="margin:0 auto 10px auto">
+      <tr>
+        <td style="padding:0 5px 0 5px"><img alt="" src="images/fig5_64.jpg"></td>
+        <td style="padding:0 5px 0 5px"><img alt="" src="images/fig5_256.jpg"></td>
+      </tr>
+      <tr>
+        <td style="text-align:center">64 spp</td>
+        <td style="text-align:center">256 spp</td>
+      </tr>
+    </table>
+    <p>
+      Create a folder named <span class="tt">task2</span> containing all your source files for this task.
+    </p>
+
+    <h3>Task 3. Path Tracing with Next Event Estimation</h3>
+    <h4>Task 3-1. Path Tracing Version 1.1</h4>
+    <p>
+      Now it is time to take some real challenge.
+      For this task, you need to implement the "Version 1.1" path tracing with <em>next event estimation</em> (see slide 36).
+    </p>
+    <p>
+      Since there is only one hard-coded light source in the scene (which is <span class="tt">spheres[7]</span>, the last sphere), uniformly sampling a point on its surface can be done as follows.
+      Let $\mathrm{p}_0 = (x_0, y_0, z_0)$ be the center of the light source and $r_0$ be its radius, and let $\xi_1$ and $\xi_2$ be two random numbers drawn independently from $U[0, 1)$,
+      then $\mathrm{y} = (x_0, y_0, z_0) + r_0 (x, y, z)$ with
+      $$
+        z = 2\xi_1 - 1, \quad x = \sqrt{1 - z^2} \cos(2\pi\xi_2), \quad y = \sqrt{1 - z^2} \sin(2\pi\xi_2),
+      $$
+      will be distributed uniformly on the light source's surface (i.e., $ p(\mathrm{y}) \equiv \frac{1}{4\pi r_0^2} $), and the normal direction $\mathrm{n}_{\mathrm{y}}$ simply equals $(x, y, z)$.
+    </p>
+    <p>
+      Please use the original all-diffuse scene configuration (same as Task 1).
+      If everything works properly, you should observe significant improvements on image quality:
+    </p>
+    <table style="margin:0 auto 10px auto">
+      <tr>
+        <td style="padding:0 5px 0 5px"><img alt="" src="images/fig6_64.jpg"></td>
+        <td style="padding:0 5px 0 5px"><img alt="" src="images/fig6_256.jpg"></td>
+      </tr>
+      <tr>
+        <td style="text-align:center">64 spp</td>
+        <td style="text-align:center">256 spp</td>
+      </tr>
+    </table>
+    <p>
+      Create a folder named <span class="tt">task3-1</span> with all your source files for this task.
+    </p>
+
+    <h4>Task 3-2. Fixing Specular Surfaces</h4>
+    <p>
+      Path Tracing Version 1.1 works well on rough materials but has difficulty handling specular surfaces.
+      For example, if switching to the scene configuration of Task 2, you will get results similar to the following:
+      <img alt="" src="images/fig7_prob.jpg" style="display:block;margin:5px auto 10px auto">
+      Notice the black circle within the bright region on the glossy sphere?
+      This is NOT an artifact.  Instead, it is the <em>mirror image</em> of the spherical light source!
+      The reason for this mirror image to be completely black is that our <em>direct radiance estimation</em> simply does not work for ideal specular surfaces.
+    </p>
+    <p>
+      <b>Explanation:</b>
+      Given a surface point $\mathrm{x}$ and outgoing direction $\omega_o$, the direct radiance is estimated by randomly selecting a point $\mathrm{y}$ on the surface of the light source, and setting the incoming direction $\omega_i$ to $\text{normalize}(\mathrm{y} - \mathrm{x})$.
+      Unfortunately, in this case, the estimated direct radiance will almost surely (i.e., with probability one) be zero.
+      This is because $\omega_i$ has zero probability to exactly equal <span class="tt">mirroredDirection($\mathrm{n}_{\mathrm{x}}$, $\omega_o$)</span> (i.e., the mirrored version of $\omega_o$), which is required for the ideal specular BRDF to have non-zero values.
+    </p>
+    <p>
+      To fix this problem, one approach is to disable next event estimation at ideal specular surfaces.
+      That is, when estimating the radiance value at $\mathrm{x}$ with direction $\omega$, one first checks if $\mathrm{x}$ lies on an ideal specular surface.
+      If so, then follow Path Tracing Version 0.5 by simpling a direction and continuing the recursion.
+      Otherwise, follow Path Tracing Version 1.1 by sampling a position on the light source first.
+    </p>
+    <p>
+      To implement this idea, you need to add a (virtual) member function to the <span class="tt">BRDF</span> class: <span class="tt">virtual bool isSpecular() const = 0</span>, as well as implementing this function for the subclasses <span class="tt">DiffuseBRDF</span> and <span class="tt">SpecularBRDF</span>.
+      In particular, you should make <span class="tt">DiffuseBRDF::isSpecular()</span> to return <span class="tt">false</span> and <span class="tt">SpecularBRDF::isSpecular()</span> to return <span class="tt">true</span>.
+      With these functions ready, you can then call <span class="tt">brdf.isSpecular()</span> in various radiance estimation functions.
+    </p>
+    <p>
+      With everything in place, you should see the following (much better quality than Task 2!):
+    </p>
+    <table style="margin:0 auto 10px auto">
+      <tr>
+        <td style="padding:0 5px 0 5px"><img alt="" src="images/fig7_64.jpg"></td>
+        <td style="padding:0 5px 0 5px"><img alt="" src="images/fig7_256.jpg"></td>
+      </tr>
+      <tr>
+        <td style="text-align:center">64 spp</td>
+        <td style="text-align:center">256 spp</td>
+      </tr>
+    </table>
+    <p>
+      Create a folder named <span class="tt">task3-2</span> with all your source files for this task.
+    </p>
+
+    <h3>Extra Credit: More BRDFs</h3>
+    <p>
+      Implement more BRDFs (e.g., Blinn-Phong, microfacet) with proper sampling schemes, and apply them to various spheres in the scene.
+      Create a folder named <span class="tt">task-extra</span> with all your source files for this task.
+    </p>
+  </div>
+</body>
+</html>

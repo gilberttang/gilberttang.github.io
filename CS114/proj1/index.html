@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>CS114 Project 1: WebGL</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="">
+  <meta name="author" content="">
+
+  <!-- Le styles -->
+  <link href="../../css/bootstrap.css" rel="stylesheet">
+  <link href="../../css/cs114.css" rel="stylesheet">
+
+  <!-- Le HTML5 shim, for IE6-8 support of HTML5 elements -->
+  <!--[if lt IE 9]>
+    <script src="http://html5shim.googlecode.com/svn/trunk/html5.js"></script>
+  <![endif]-->
+
+  <script type="text/javascript" src="../../js/jquery.js"></script>
+  <script type="text/javascript" src="../../js/bootstrap.js"></script>
+  <script type="text/x-mathjax-config">
+    MathJax.Hub.Config({
+      tex2jax: {inlineMath: [['$','$'], ['\\(','\\)']]}
+    });
+  </script>
+  <script type="text/javascript" src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+</head>
+
+  <div class="container" id="main">
+    <h1 id="head1">CS114 Project 1: <span class=subtitle>WebGL</span></h1>
+    <!--<p class="courseinfo">Out: Tuesday Apr 5, 2016</p>-->
+    <p class="courseinfo">Due: Tuesday Apr 12, 2016 (23:59pm Pacific Time)</p>
+    <p class="courseinfo"><em>Work individually or in groups of two.</em></p>
+
+    <h2 id="overview">Overview</h2>
+    <p style="font-size:16px">
+      <em>Download the project codebase <a href="pa1_student.zip">here</a>.</em>
+      Please use <a href="https://piazza.com/uci/spring2016/cs114/home">Piazza</a> for questions, discussions, and pairing up.
+    </p>
+    
+    <p>The main focus of this project is using WebGL's fragment shader to implement a number of shading models:</p>
+    <ul>
+      <li>Diffuse Shading</li>
+      <li>Phong and Blinn-Phong Shading</li>
+      <li>(Isotropic) Microfacet Shading</li>
+    </ul>
+    <p>
+      To finish all non-optional tasks, the only file you will need to modify is <span class="tt">proj1_student.html</span> which contains all the shader code.
+      We recommend using text editors such as vim, emacs, <a href="https://www.sublimetext.com/">Sublime</a>, or <a href="https://notepad-plus-plus.org/">Notepad++</a> for coding and <a href="https://www.google.com/chrome">Google Chrome</a> to run your code (although recent versions of <a href="https://www.mozilla.org/en-US/firefox/">Mozilla Firefox</a> and <a href="http://windows.microsoft.com/en-us/internet-explorer">Microsoft IE</a>/<a href="https://www.microsoft.com/en-us/windows/microsoft-edge">Edge</a> should also work).
+      Remember to keep the <a href="https://developer.chrome.com/devtools/docs/console">console</a> open for seeing Javascript/GL error messages.
+    </p>
+
+    <p>The <em>vertex shader</em> has been provided for you:</p>
+
+<pre style='color:#000020;background:#f6f8ff;width:600px'><span style='color:#595979; '>&lt;!-- Common vertex shader for all shading models --></span>
+<span style='color:#0057a6; '>&lt;</span><span style='color:#200080; font-weight:bold; '>script</span><span style='color:#474796; '> </span><span style='color:#074726; '>id</span><span style='color:#308080; '>=</span><span style='color:#1060b6; '>"shader-vs"</span><span style='color:#474796; '> </span><span style='color:#074726; '>type</span><span style='color:#308080; '>=</span><span style='color:#1060b6; '>"x-shader/x-vertex"</span><span style='color:#0057a6; '>></span>
+    uniform mat4 uMVMatrix<span style='color:#406080; '>;</span>             <span style='color:#595979; '>// Model-view matrix</span>
+    uniform mat4 uPMatrix<span style='color:#406080; '>;</span>              <span style='color:#595979; '>// Projection matrix</span>
+    uniform mat4 uNMatrix<span style='color:#406080; '>;</span>              <span style='color:#595979; '>// Normal matrix</span>
+
+    attribute vec3 aVertexPosition<span style='color:#406080; '>;</span>     <span style='color:#595979; '>// Vertex position in object space</span>
+    attribute vec3 aVertexNormal<span style='color:#406080; '>;</span>       <span style='color:#595979; '>// Vertex normal in object space</span>
+
+    varying vec3 vPosition<span style='color:#406080; '>;</span>             <span style='color:#595979; '>// Vertex position (camera space)</span>
+    varying vec3 vNormal<span style='color:#406080; '>;</span>               <span style='color:#595979; '>// vertex normal (camera space)</span>
+
+    <span style='color:#200080; font-weight:bold; '>void</span> main<span style='color:#308080; '>(</span><span style='color:#200080; font-weight:bold; '>void</span><span style='color:#308080; '>)</span> <span style='color:#406080; '>{</span>
+        vec4 camSpacePosition <span style='color:#308080; '>=</span> uMVMatrix <span style='color:#308080; '>*</span> vec4<span style='color:#308080; '>(</span>aVertexPosition<span style='color:#308080; '>,</span> <span style='color:#008000; '>1.0</span><span style='color:#308080; '>)</span><span style='color:#406080; '>;</span>
+        vPosition <span style='color:#308080; '>=</span> vec3<span style='color:#308080; '>(</span>camSpacePosition<span style='color:#308080; '>)</span><span style='color:#406080; '>;</span>
+
+        gl_Position <span style='color:#308080; '>=</span> uPMatrix <span style='color:#308080; '>*</span> camSpacePosition<span style='color:#406080; '>;</span>        
+
+        vec4 camSpaceNormal <span style='color:#308080; '>=</span> uNMatrix <span style='color:#308080; '>*</span> vec4<span style='color:#308080; '>(</span>aVertexNormal<span style='color:#308080; '>,</span> <span style='color:#008000; '>0.0</span><span style='color:#308080; '>)</span><span style='color:#406080; '>;</span>
+        vNormal <span style='color:#308080; '>=</span> vec3<span style='color:#308080; '>(</span>camSpaceNormal<span style='color:#308080; '>)</span><span style='color:#406080; '>;</span>
+    <span style='color:#406080; '>}</span>
+<span style='color:#0057a6; '>&lt;/</span><span style='color:#200080; font-weight:bold; '>script</span><span style='color:#0057a6; '>></span>
+</pre>
+
+    <p>Besides clip-space position of each vertex, the vertex shader also computes camera-space position (<span class="tt">vPosition</span>) and normal (<span class="tt">vNormal</span>) which will be useful for implementing shading models.</p>
+
+    <p>The only <em>fragment shader</em> provided to you simply returns white (i.e., <span class="tt">vec4(1.0, 1.0, 1.0, 1.0)</span>) for all fragments:</p>
+
+<pre style='color:#000020;background:#f6f8ff;width:600px'><span style='color:#308080; '>&lt;</span>script id<span style='color:#308080; '>=</span><span style='color:#800000; '>"</span><span style='color:#1060b6; '>shader-fs0</span><span style='color:#800000; '>"</span> type<span style='color:#308080; '>=</span><span style='color:#800000; '>"</span><span style='color:#1060b6; '>x-shader/x-fragment</span><span style='color:#800000; '>"</span><span style='color:#308080; '>></span>
+    precision mediump <span style='color:#200080; font-weight:bold; '>float</span><span style='color:#406080; '>;</span>
+
+    varying vec3 vPosition<span style='color:#406080; '>;</span>             <span style='color:#595979; '>// Vertex position (camera space)</span>
+    varying vec3 vNormal<span style='color:#406080; '>;</span>               <span style='color:#595979; '>// Vertex normal (camera space)</span>
+
+    <span style='color:#200080; font-weight:bold; '>void</span> <span style='color:#400000; '>main</span><span style='color:#308080; '>(</span><span style='color:#200080; font-weight:bold; '>void</span><span style='color:#308080; '>)</span> <span style='color:#406080; '>{</span>
+        <span style='color:#595979; '>// Dummy variable to ensure the use of all vertex attributes.</span>
+        vec4 zero <span style='color:#308080; '>=</span> vec4<span style='color:#308080; '>(</span>vPosition <span style='color:#308080; '>+</span> vNormal <span style='color:#308080; '>-</span> vPosition <span style='color:#308080; '>-</span> vNormal<span style='color:#308080; '>,</span> <span style='color:#008000; '>0.0</span><span style='color:#308080; '>)</span><span style='color:#406080; '>;</span>
+
+        gl_FragColor <span style='color:#308080; '>=</span> zero <span style='color:#308080; '>+</span> vec4<span style='color:#308080; '>(</span><span style='color:#008000; '>1.0</span><span style='color:#308080; '>,</span> <span style='color:#008000; '>1.0</span><span style='color:#308080; '>,</span> <span style='color:#008000; '>1.0</span><span style='color:#308080; '>,</span> <span style='color:#008000; '>1.0</span><span style='color:#308080; '>)</span><span style='color:#406080; '>;</span>
+    <span style='color:#406080; '>}</span>
+<span style='color:#308080; '>&lt;</span><span style='color:#308080; '>/</span>script<span style='color:#308080; '>></span>
+</pre>
+
+    <p>
+      Do not worry about the dummy variable <span class="tt">zero</span>.
+      It is used to ensure that all vertex attributes are acutally used: certain WebGL compilers automatically remove <em>inactive</em> attributes, causing GL Errors when assigning attribute data.
+      You can simply leave <span class="tt">zero</span> as is and add it to the fragment color for shaders.
+    </p>
+    <p>As a result, you will see boring renderings like this:</p>
+
+    <p><img alt="teapot_white" src="images/teapot_white.jpg"></p>
+
+    <p>During this project, you will write fragment shaders generating much more interesting images!</p>
+
+    <p>
+      <em><b>Useful reference:</b> <a href="http://www.shaderific.com/glsl-functions/">OpenGL ES Shading Language built-in functions</a></em>
+    </p>
+
+    <h2 id="task1">Task 1: Normal, Viewing, and Lighting Directions</h2>
+    <p>
+      To warm up, you first task is to write three very simple shaders that visualize fragment position as well as normal and lighting directions (all in camera space).
+      In <span class="tt">proj1_student.html</span>, please use the fragment shader with id <span class="tt">shader-fs1-1</span>, namely the <span class="tt">&lt;script&gt;</span> element starting with
+    </p>
+
+<pre style='color:#000020;background:#f6f8ff;width:600px'><span style='color:#0057a6; '>&lt;</span><span style='color:#200080; font-weight:bold; '>script</span><span style='color:#474796; '> </span><span style='color:#074726; '>id</span><span style='color:#308080; '>=</span><span style='color:#1060b6; '>"shader-fs1-1"</span><span style='color:#474796; '> </span><span style='color:#074726; '>type</span><span style='color:#308080; '>=</span><span style='color:#1060b6; '>"x-shader/x-fragment"</span><span style='color:#0057a6; '>></span></pre>
+
+    <p>for position, <span class="tt">shader-fs1-2</span> for normal, and <span class="tt">shader-fs1-3</span> for lighting visualizations.</p>
+
+    <p>
+      For your convenience, all needed uniform/varying variables have been pre-declared.
+      You only need to complete the <span class="tt">void main()</span> function of each shader.
+      This is also the case for Tasks 2 and 3.
+    </p>    
+
+    <h4 style="margin-top:30px">1-1. Position</h4>
+    <p>
+      Let $\mathrm{p}$ be the camera-space position of a fragment (which is stored in a varying variable named <span class="tt">vPosition</span>), simply set the fragment color (i.e., <span class="tt">gl_FragColor</span>) to 
+      $$\mathrm{fragColor} = | \mathrm{p} |,$$
+      where $| \cdot |$ denotes the absolute-value (i.e., <span class="tt">abs()</span>) operation.
+    <p>
+    <p>
+      Notice that <span class="tt">gl_FragColor</span> has the type of <span class="tt">vec4</span> (i.e., 4D vector) while <span class="tt">vPosition</span> is <span class="tt">vec3</span>.
+      Thus, you will need to use <span class="tt">vec4(vPosition, 1.0)</span> to cast <span class="tt">vPosition</span> into a 4D vector.
+    </p>
+    <p>With a correct implementation, you should see the following:</p>
+    <p><img alt="teapot_pos" src="images/teapot_pos.jpg"></p>
+
+    <h4 style="margin-top:30px">1-2. Normal Direction</h4>
+    <p>
+      Let $\mathrm{n}$ be a fragment's camera-space normal direction (stored in varying-variable <span class="tt">vNormal</span>), set the fragment color to
+      $$\mathrm{fragColor} = \left| \hat{\mathrm{n}} \right|,$$
+      where $\hat{\mathrm{n}} := \mathrm{n}/ \|\mathrm{n}\|$ with $\| \cdot \|$ denoting the <em>length</em> of a vector.
+      In other words, you need to set the fragment color to (the absolute value of) the <em>normalized</em> version of $\mathrm{n}$ (hint: using the <span class="tt">normalize()</span> function for simpler code).
+    </p>
+    <p>With a correct implementation, you should see the following:</p>
+    <p><img alt="teapot_norm" src="images/teapot_norm.jpg"></p>
+
+    <h4 style="margin-top:30px">1-3. Lighting Direction</h4>
+    <p>
+      In this project, the scene only contains one point light source.
+      Let $\mathrm{p}_{\mathrm{light}}$ be its camera-space position (stored in uniform-variable <span class="tt">uLightPos</span>).
+      For a fragment with position $\mathrm{p}$, the lighting direction (i.e., the direction from which light comes) is $\mathrm{i} := \mathrm{p}_{\mathrm{light}} - \mathrm{p}$.
+      You need to set the fragment color to
+      $$\mathrm{fragColor} = \left| \hat{\mathrm{i}} \right|,$$
+      where $\hat{\mathrm{i}} := \mathrm{i}/\|\mathrm{i}\|$.
+      With a correct implementation, you should see the following:
+    </p>
+    <p><img alt="teapot_light" src="images/teapot_light.jpg"></p>
+
+    <h2 id="task2">Task 2: Diffuse (Lambertian) Shading Model</h2>
+    <p>The first actual model you need to implement is the <em>Diffuse Shading Model</em>. Please modify the fragment shader with id <span class="tt">shader-fs2</span>.</p>
+
+    <p>Besides input (uniform/varying) variables used in Task 1, this shader takes three extra uniform variables as input:</p>
+    <ul>
+      <li><b>Diffuse color</b> $k_d$: a 3D (RGB) vector stored in <span class="tt">uDiffuseColor</span>;</li>
+      <li><b>Light source "power"</b> $I_0$: a scalar stored in <span class="tt">uLightPower</span>;</li>
+      <li><b>Ambient intensity</b> $c_0$: a scalar stored in <span class="tt">uAmbient</span>.</li>
+    </ul>
+    <p>
+      Under this shading model while following the notations in Task 1, the fragment color is given by
+      $$ \mathrm{fragColor} = k_d \left(I \cdot \max(\langle \hat{\mathrm{n}}, \hat{\mathrm{i}} \rangle, 0) + c_0\right), $$
+      where $\langle \cdot , \cdot \rangle$ denotes the <em>dot product</em> of two vectors, and $I$ is the "intensity" of incoming light and equals
+      $$ I := \frac{I_0}{\| \mathrm{i} \|^2/5 + 5}, $$
+      where $\mathrm{i}$ is the (unnormalized) lighting direction defined in Task 1-3.
+    </p>
+    <p>
+      With a correct implementation, you should see the following (with default lighting/shading parameters):
+    </p>
+    <p><img alt="teapot_diffuse" src="images/teapot_diffuse.jpg"></p> 
+
+    <h2 id="task3">Task 3: Phong and Blinn-Phong Shading Models</h2>
+    <p>Now it is time to add some highlights! For this task, you will implement the Phong and the Blinn-Phong, two of the earliest shading models designed for this purpose.</p>
+
+    <h4 style="margin-top:30px">3-1. Phong Shading</h4>
+    <p>
+      For each fragment, the <em>viewing</em> $\hat{\mathrm{o}}$ and <em>reflected</em> $\hat{\mathrm{r}}$ directions (in camera space) are given by
+      $$ \hat{\mathrm{o}} = - \frac{\mathrm{p}}{\| \mathrm{p} \|}, \quad \hat{\mathrm{r}} = 2 \hat{\mathrm{n}} \langle \hat{\mathrm{n}}, \hat{\mathrm{i}} \rangle - \hat{\mathrm{i}}.$$
+      The fragment color under the Phong shading is
+      $$ \mathrm{fragColor} = \begin{cases}
+       k_d \left( I \cdot \langle \hat{\mathrm{n}}, \hat{\mathrm{i}} \rangle + c_0 \right) + I \cdot \max(\langle \hat{\mathrm{o}}, \hat{\mathrm{r}} \rangle, 0)^{\alpha},
+        && \langle \hat{\mathrm{n}}, \hat{\mathrm{i}} \rangle > 0,\\
+       k_d\ c_0, && \mathrm{otherwise},
+       \end{cases} $$
+      where $\alpha$ is accessible via a uniform variable named <span class="tt">uExponent</span>.
+    </p>
+
+    <p>
+      Please edit the fragment shader with id <span class="tt">shader-fs3-1</span> to implement this shading model.
+      You should see the following with default parameter values:
+    </p>
+    <p><img alt="teapot_phong" src="images/teapot_phong.jpg"></p>
+
+    <h4 style="margin-top:30px">3-2. Blinn-Phong Shading</h4>
+    <p>
+      For each fragment, the <em>half vector</em> $\hat{\mathrm{h}}$ (between $\hat{\mathrm{i}}$ and $\hat{\mathrm{o}}$) is
+      $$ \hat{\mathrm{h}} := \frac{\hat{\mathrm{i}} + \hat{\mathrm{o}}}{\left\| \hat{\mathrm{i}} + \hat{\mathrm{o}} \right\|}. $$
+      The fragment color under the Blinn-Phong shading is then given by
+      $$ \mathrm{fragColor} = \begin{cases}
+       k_d \left( I \cdot \langle \hat{\mathrm{n}}, \hat{\mathrm{i}} \rangle + c_0 \right) + I \cdot \langle \hat{\mathrm{n}}, \hat{\mathrm{h}} \rangle^{\alpha},
+        && \langle \hat{\mathrm{n}}, \hat{\mathrm{i}} \rangle > 0,\\
+       k_d\ c_0, && \mathrm{otherwise},
+       \end{cases} $$
+      where $\alpha$ is accessible via a uniform variable named <span class="tt">uExponent</span>.
+    </p>
+    <p>
+      Please edit the fragment shader with id <span class="tt">shader-fs3-2</span> to implement this shading model.
+      You should see the following with default parameter values:
+    </p>
+    <p><img alt="teapot_blinnphong" src="images/teapot_blinnphong.jpg"></p>
+
+    <h2 id="task4">Task 4: (Isotropic) Microfacet Shading Model</h2>
+    <p>
+      Finally, let us look at a more advanced model is more physically meaningful (and accurate) than the Phong and the Blinn-Phong models.
+      Microfacet shading models treat the surface of an object as a collection of micro-mirrors characterized by the statistical distribution of their normal directions.
+      You can refer to <a href="http://www.cs.cornell.edu/~srm/publications/EGSR07-btdf.html">this paper</a> for more details, but for this task, the model boils down to computing
+      $$ \mathrm{fragColor} = \begin{cases}
+       I \cdot \langle \hat{\mathrm{n}}, \hat{\mathrm{i}} \rangle \left( k_d + \displaystyle\frac{F(\hat{\mathrm{i}}, \hat{\mathrm{h}})\ D(\hat{\mathrm{h}})\ G(\hat{\mathrm{i}}, \hat{\mathrm{o}}, \hat{\mathrm{h}})}{4 \langle \hat{\mathrm{n}}, \hat{\mathrm{i}} \rangle \langle \hat{\mathrm{n}}, \hat{\mathrm{o}} \rangle}\right) + k_d\ c_0, && \langle \hat{\mathrm{n}}, \hat{\mathrm{i}} \rangle > 0,\\
+       k_d\ c_0, && \mathrm{otherwise},
+       \end{cases} $$
+      where
+    </p>
+    <ul>
+      <li>
+        $F(\hat{\mathrm{i}}, \hat{\mathrm{h}})$ is the <em>Fresnel factor</em> and equals
+        $$ F(\hat{\mathrm{i}}, \hat{\mathrm{h}}) = \frac{1}{2} \frac{(g - c)^2}{(g + c)^2} \left( 1 + \left(\frac{c(g + c) - 1}{c(g - c) + 1}\right)^2 \right), $$
+        with $$ g := \sqrt{\eta^2 - 1 + c^2}, $$ in which $\eta$ is the material's refractive index and can be accessed through uniform variable <span class="tt">uIOR</span> and $c := \langle \hat{\mathrm{i}}, \hat{\mathrm{h}} \rangle$.
+      </li>
+      <li>
+        $D(\hat{\mathrm{h}})$ is the <em>GGX normal distribution function</em>:
+        $$ D(\hat{\mathrm{h}}) := \frac{\beta^2}{\pi \cos^4 \theta_h (\beta^2 + \tan^2 \theta_h)^2}, $$
+        where $\theta_h$ is the angle between $\hat{\mathrm{n}}$ and $\hat{\mathrm{h}}$, and $\beta$ is the surface roughness stored in uniform variable <span class="tt">uBeta</span>.
+      </li>
+      <li>
+        $G(\hat{\mathrm{i}}, \hat{\mathrm{o}}, \hat{\mathrm{h}})$ is the <em>shadowing-masking function</em> (of the GGX distribution):
+        $$ G(\hat{\mathrm{i}}, \hat{\mathrm{o}}, \hat{\mathrm{h}}) := G_1(\hat{\mathrm{i}}, \hat{\mathrm{h}})\ G_1(\hat{\mathrm{o}}, \hat{\mathrm{h}}), $$
+        and
+        $$ G_1(\mathrm{v}, \hat{\mathrm{h}}) := \frac{2}{1 + \sqrt{1 + \beta^2 \tan^2 \theta_v}}, $$
+        where $\theta_v$ is the angle between $\hat{\mathrm{n}}$ and $\mathrm{v}$ (for any unit vector $\mathrm{v}$).
+      </li>
+    </ul>
+    <p>
+      Please edit the fragment shader with id <span class="tt">shader-fs4</span> to implement this model.
+      You should see the following with default parameter values:
+    </p>
+    <p><img alt="teapot_microfacet" src="images/teapot_microfacet.jpg"></p>    
+    <p>
+      <b>Hint:</b> let $\mathrm{u}_1$ and $\mathrm{u}_2$ be two unit vectors and $\theta$ be the angle between them, then it holds that
+      $$
+        \cos\theta = \langle \mathrm{u}_1, \mathrm{u}_2 \rangle, \qquad
+        \tan^2\theta = \frac{\sin^2 \theta}{\cos^2 \theta} = \frac{1}{\cos^2\theta} - 1 = \frac{1}{\langle \mathrm{u}_1, \mathrm{u}_2 \rangle^2} - 1.
+      $$
+    </p>
+
+    <h2 id="task_extra">Extra Credit: Customizing Specular Color</h2>
+    <p><em style="color:#c00000">
+      <b>Warning:</b> This optional task requires significantly more coding than the previous ones.
+      Please ensure the correctness of your implementation for all previous tasks before trying this one!
+    </em></p>
+
+    <p>
+      If you are interested in digging deeper into the provided codebase and doing some general HTML/Javascript programming, consider making the specular color $k_s$, which is currently fixed to one (i.e., white), customizable:
+    </p>
+    <p><img alt="" src="images/extra_credit.jpg"></p>
+    <p>
+      In this case, the shading models for Tasks 3 and 4 become
+      $$
+        \begin{align}
+          \mathrm{fragColor}_{\mathrm{Phong}} &= \begin{cases}
+            k_d \left( I \cdot \langle \hat{\mathrm{n}}, \hat{\mathrm{i}} \rangle + c_0 \right) + k_s\ I \cdot \max(\langle \hat{\mathrm{o}}, \hat{\mathrm{r}} \rangle, 0)^{\alpha}, && \langle \hat{\mathrm{n}}, \hat{\mathrm{i}} \rangle > 0,\\
+            k_d\ c_0, && \mathrm{otherwise};
+          \end{cases}\\[10pt]
+          \mathrm{fragColor}_{\mathrm{Blinn-Phong}} &= \begin{cases}
+            k_d \left( I \cdot \langle \hat{\mathrm{n}}, \hat{\mathrm{i}} \rangle + c_0 \right) + k_s\ I \cdot \langle \hat{\mathrm{n}}, \hat{\mathrm{h}} \rangle^{\alpha}, && \langle \hat{\mathrm{n}}, \hat{\mathrm{i}} \rangle > 0,\\
+            k_d\ c_0, && \mathrm{otherwise};
+          \end{cases}\\[10pt]
+          \mathrm{fragColor}_{\mathrm{microfacet}} &= \begin{cases}
+            I \cdot \langle \hat{\mathrm{n}}, \hat{\mathrm{i}} \rangle \left( k_d + k_s \displaystyle\frac{F(\hat{\mathrm{i}}, \hat{\mathrm{h}})\ D(\hat{\mathrm{h}})\ G(\hat{\mathrm{i}}, \hat{\mathrm{o}}, \hat{\mathrm{h}})}{4 \langle \hat{\mathrm{n}}, \hat{\mathrm{i}} \rangle \langle \hat{\mathrm{n}}, \hat{\mathrm{o}} \rangle}\right) + k_d\ c_0, && \langle \hat{\mathrm{n}}, \hat{\mathrm{i}} \rangle > 0,\\
+            k_d\ c_0, && \mathrm{otherwise}.
+          \end{cases}
+        \end{align}
+      $$
+    </p>
+    <p>
+      You will need to add one uniform (RGB) variable to each corresponding fragment shader to handle $k_s$.
+      In addition, you should add an additional color picker.
+      This can be achieved by:
+    </p>
+    <ul>
+      <li>Adding one <span class="tt">&lt;input type="text" ...&gt;</span> element to <span class="tt">proj1_student.html</span> (similar to the one with <span class="tt">id="colorPicker"</span>).</li>
+      <li>Editing <span class="tt">proj1.js</span> following <span class="tt">$("#colorPicker").spectrum(...)</span> to turn the previously added <span class="tt">&lt;input&gt;</span> element into an actual color picker (thanks to <a href="https://bgrins.github.io/spectrum/">spectrum.js</a>).</li>
+      <li>Editing <span class="tt">proj1_webgl.js</span> to declare and initialize the new uniform variable and its local copy (check how <span class="tt">shaderProg.kdUniform</span> and <span class="tt">diffuseColor</span> works).</li>
+    </ul>
+  </div>
+</body>
+</html>

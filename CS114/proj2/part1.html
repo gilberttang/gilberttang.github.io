@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>CS114 Project 2: Monte Carlo Integration &amp; Path Tracing</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="">
+  <meta name="author" content="">
+
+  <!-- Le styles -->
+  <link href="../../css/bootstrap.css" rel="stylesheet">
+  <link href="../../css/cs114.css" rel="stylesheet">
+
+  <!-- Le HTML5 shim, for IE6-8 support of HTML5 elements -->
+  <!--[if lt IE 9]>
+    <script src="http://html5shim.googlecode.com/svn/trunk/html5.js"></script>
+  <![endif]-->
+
+  <script type="text/javascript" src="../../js/jquery.js"></script>
+  <script type="text/javascript" src="../../js/bootstrap.js"></script>
+  <script type="text/x-mathjax-config">
+    MathJax.Hub.Config({
+      tex2jax: {inlineMath: [['$','$'], ['\\(','\\)']]}
+    });
+  </script>
+  <script type="text/javascript" src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+</head>
+
+  <div class="container" id="main">
+    <h1 id="head1">CS114 Project 2:<br><span class=subtitle>Monte Carlo Integration &amp; Path Tracing</span></h1>
+    <p class="courseinfo">Due: Tuesday May 3, 2016 (23:59pm Pacific Time)</p>
+    <p class="courseinfo"><em>Work individually or in groups of two.</em></p>
+
+    <h2>Part 1. Monte Carlo Integration</h2>
+    <p>
+      In this part, you will implement several Monte Carlo estimators for computing integrals and compare their efficiencies.
+    </p>
+    <p>Please submit a ZIP package for this task containing:</p>
+    <ul>
+      <li>A report (in PDF format) with all experimental results (see individual tasks for details);</li>
+      <li>All your source code. You can use any programming language, but C++ is highly recommended as your C++ implementations will come in handy for Part 2.</li>
+    </ul>
+
+    <h3>Task 1. One-Dimensional Problems</h3>
+    <h4>Task 1-1. Warming up</h4>
+    <p>
+      Compute the following integral
+      $$ I = \int_{-2}^2 \exp\left(-\frac{x^2}{2}\right)\,\mathrm{d}x, $$
+      (where $\exp()$ denotes the natural exponential function) using Monte Carlo integration with density function
+      $$ p(x) \equiv \frac{1}{4} \quad\text{for all $-2 \leq x < 2$.} $$
+    </p>
+    <p>You should start with drawing $N = 100\ 000$ samples $x_1,\ x_2,\ \ldots,\ x_N \in [-2, 2)$:</p>
+    <ul>
+      <li>If you choose to implemenmt this task with C++ (which is recommended!), use <a href="http://en.cppreference.com/w/cpp/numeric/random/uniform_real_distribution">C++11's pseudo-random number generator</a> instead of the outdated <span class="tt">rand()</span> function.</li>
+      <li>For Python users, use <a href="http://docs.scipy.org/doc/numpy/reference/generated/numpy.random.rand.html#numpy.random.rand">numpy's random module</a>.</li>      
+      <li>For Java users, use <a href="https://docs.oracle.com/javase/7/docs/api/java/util/Random.html">the built-in <span class="tt">Random</span> class</a>.</li>
+    </ul>
+    <p>
+      With $x_1,\ x_2,\ \ldots,\ x_N$ generated, you then need to evaluate $\hat{I}_{\!1},\ \hat{I}_{\!2},\ \ldots,\ \hat{I}_{\!N}$ given by:
+      $$ \hat{I}_{\!j} = \frac{\exp(-x_j^2/2)}{p(x_j)} \quad\text{for $j = 1,\ 2,\ \ldots, N$}, $$
+      and include the following in your report:
+    </p>
+    <ul>
+      <li>Sample mean: $$ \bar{I} := \frac{1}{N} \sum_{j = 1}^N \hat{I}_{\!j}, $$</li>
+      <li>
+        (Scaled) deviation: $$ \bar{s} = \frac{2s}{\sqrt{N}}, $$
+        with $s$ being sample standard deviation given by
+        $$ s := \sqrt{\frac{\displaystyle\sum_{j=1}^N \left(\hat{I}_{\!j} - \bar{I}\right)^2}{N - 1}}. $$
+        (See <a href="https://www.youtube.com/watch?v=KkaU2ur3Ymw">this</a> if you are interested to know why $s$ has $N - 1$ instead of $N$ in its denominator.)
+      </li>
+    </ul>
+    <p>
+      Please execute your code 10 times (with non-fixed random seeds), and you should get 10 sets of slightly different $\bar{I}$ and $\bar{s}$ values.
+      Report all of them (rounded to three decimal places) in a table that looks like:
+    </p>
+    <table border="1" style="margin: 10px auto 10px auto">
+      <tr>
+        <td style="padding: 5px 10px 5px 10px">Round</td>
+        <td style="padding: 5px 20px 5px 20px">$\bar{I}$</td>
+        <td style="padding: 5px 20px 5px 20px">$\bar{s}$</td>
+      </tr>
+      <tr>
+        <td style="text-align: center">1</td>
+        <td style="text-align: center">x.xxx</td>
+        <td style="text-align: center">x.xxx</td>
+      </tr>
+      <tr>
+        <td style="text-align: center">2</td>
+        <td style="text-align: center">x.xxx</td>
+        <td style="text-align: center">x.xxx</td>        
+      </tr>
+      <tr>
+        <td style="text-align: center">$\vdots$</td>
+        <td style="text-align: center">$\vdots$</td>
+        <td style="text-align: center">$\vdots$</td>
+      </tr>
+      <tr>
+        <td style="text-align: center">10</td>
+        <td style="text-align: center">x.xxx</td>
+        <td style="text-align: center">x.xxx</td>
+      </tr>      
+    </table>
+    <p>
+      <b>Remark:</b> If you implement everything correctly, the interval $[ \bar{I} - \bar{s},\ \bar{I} + \bar{s} ]$ should contain the correct answer 2.3926 about 95% of the time.
+      As a result, this interval is called a <em>95% confidence interval</em>.
+    </p>
+
+    <h4>Task 1-2. Integrals over Unbounded Intervals</h4>
+    <p>
+      Compute the following integral
+      $$ I = \int_{1}^{\infty} \exp\left(-\frac{x^2}{2}\right)\,\mathrm{d}x. $$
+    </p>
+    <p>
+      Since this integral is defined over the unbounded interval $[1, \infty)$, uniform distributions cannot be used.
+      Instead, please draw $\xi$ uniformly from $[0, 1)$, and set
+      $$ x = 1 - \frac{\log \xi}{\lambda} $$
+      (where $\log()$ is the natural logarithm function) with some fixed $\lambda > 0$.
+      In this case, $x$ will be distributed <a href="https://en.wikipedia.org/wiki/Exponential_distribution">exponentially</a> with probability density
+      $$ p(x ; \lambda) = \lambda \exp(-\lambda (x - 1)). $$
+    </p>
+    <p>
+      Please try three different $\lambda$ values: 0.1, 1.0, and 10.0.
+      For each $\lambda$, create a table with 10 sets of $\bar{I}$ and $\bar{s}$ values each of which uses $N = 100\ 000$ independent samples (similar to Task 1-1).
+      Then, discuss in your report:
+    </p>
+    <ul>
+      <li>Which $\lambda$ value has led to an estimator with best efficiency?</li>
+      <li><b>Optional:</b> Why? (You do not have to provide rigorous math, but try including some high-level explanations.)</li>
+    </ul>
+
+    <h3>Task 2. Integrals over Unit Spheres</h3>
+    <h4>Task 2-1. Surface Area of the Hemisphere</h4>
+    <p>
+      As shown in <a href="http://www.ics.uci.edu/~shz/courses/cs114/slides/radiometry.pdf">class</a>, the surface area of a unit hemisphere can be computed using sphere coordinates ($\theta$, $\phi$) as
+      $$ \int_0^{2\pi} \int_0^{\pi/2} \sin\theta \mathrm{d}\theta \mathrm{d}\phi. $$
+      Let $A := [0, \frac{\pi}{2}) \times [0, 2\pi)$ be a 2D rectangle, then the previous integral can be rewritten as
+      $$ I := \int_A \sin({\bf x}[1])\,\mathrm{d}{\bf x}, $$
+      where ${\bf x}$ is a 2D vector and ${\bf x}[1]$ denotes its first component (that is, if ${\bf x} = (a, b)$, then ${\bf x}[1] = a$).
+    </p>
+    <p>
+      Use Monte Carlo integration to estimate $I$ by uniformly sampling ${\bf x}$ from $A$.
+      That is, generating each sample by:
+    </p>
+    <ul>
+      <li>
+        Setting
+        $$ {\bf x}_j \gets \left(\frac{\pi}{2} \xi_{j,1},\ 2\pi \xi_{j,2} \right) \quad\text{for $j = 1, 2, \ldots, N$,} $$
+        with $\xi_{j,1}$ and $\xi_{j,2}$ drawn independently from $U[0, 1)$;
+      </li>
+      <li>
+        Evaluating $\hat{I}_{\!j}$ accordingly.
+      </li>
+    </ul>
+    <p>Include a table similar to Task 1-1 in your report.</p>
+
+    <h4>Task 2-2. Arbitrary Spherical Function</h4>
+    <p>
+      Let
+      $$ \begin{aligned}
+        \theta &= \arccos(\xi_1),\\
+        \phi &= 2\pi\xi_2,
+      \end{aligned} $$
+      where $\xi_1,\ \xi_2$ are drawn independently from $U[0, 1)$.
+      Then it can be shown that $\omega := (\theta, \phi)$ in spherical coordinates is distributed uniformly over the hemisphere centered at (0, 0, 0).
+      That is,
+      $$ p(\omega) \equiv \frac{1}{2\pi}, $$
+      for all $\omega$'s generated this way.
+    </p>
+    <p>
+      Use this sampling scheme to estimate the following integral:
+      $$
+        I = \int_{\Omega_+} (\cos\theta\,\sin\theta\,\cos\phi)^2\,\mathrm{d}\omega,
+      $$
+      where $\Omega_+$ denotes the entire unit hemisphere with $\theta \in [0, \frac{\pi}{2})$.
+      Include a table similar to Task 1-1 in your report.
+    </p>
+
+    <h3>Task 3. Estimating Radiant Flux</h3>
+    <p>Consider a simple 3D scene with two objects:</p>
+    <ul>
+      <li>A unit square $R$ in the XOY plane centered at the origin (i.e., with two corners at $(-0.5, -0.5, 0)$ and $(0.5, 0.5, 0)$);</li>
+      <li>A spherical light source $S$ centered at $(1, 1, 5)$ with radius 1.</li>
+    </ul>
+    <p>
+      This light source is a <em>uniform emitter</em>: its emitted radiance (at any point on the surface in any direction) is fixed to $L = 100$.
+      Then, the radiant flux (i.e., power) received by $R$ equals
+      $$
+        P = \int_S \int_{\Omega_+} L \cdot \chi({\bf x}, \omega) \cdot \cos\theta\,\mathrm{d}{\omega}\,\mathrm{d}{\bf x},
+      $$
+      where $\theta$ is the angle between $\omega$ and the Z-axis, and $\chi$ is an <em>indicator function</em> given by
+      $$
+        \chi({\bf x}, \omega) = \begin{cases}
+          1 & \text{if ray $({\bf x}, \omega)$ hits $S$,}\\
+          0 & \text{otherwise}.
+        \end{cases}
+      $$
+      Two examples are shown below:
+      <img src="images/fig1.jpg" alt="" style="width: 600px; display: block; margin-left: auto; margin-right: auto">
+    </p>
+    <p>
+      Use Monte Carlo integration to estimate $P$ by uniformly sampling ${\bf x} \in R$ and $\omega \in \Omega_+$.
+      Pick proper number of samples so that the resulting estimation is accurate to one decimal place.
+      Report your estimated $P$ value and the number of samples used.
+    </p>
+    <p>
+      <b>Extra Credit:</b> Use non-uniform sampling for $\omega$ to achieve better convergence rate.
+      Describe in your report:
+    </p>
+    <ul>
+      <li>The density function you picked;</li>
+      <li>The way you generate samples of $\omega$;</li>
+      <li>The number of samples needed to achieve the same accuracy (of one decimal place).</li>
+    </ul>
+  </div>
+</body>
+</html>
